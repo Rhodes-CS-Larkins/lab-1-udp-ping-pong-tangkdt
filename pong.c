@@ -15,7 +15,7 @@
 #include "util.h"
 
 #define PORTNO "1266"
-#define BUFSIZE 1024
+#define MAX_ARR 1024
 
 int server_setup(char *port);
 
@@ -59,15 +59,14 @@ int server_setup(char *port) {
 }
 
 int main(int argc, char **argv) {
-  int ch;
+  int ch, sockfd;
   int nping = 1;                    // Default packet count
   char *pongport = strdup(PORTNO);  // Default port
-  int sockfd;
   struct sockaddr_storage peer_addr; 
-  socklen_t peer_addr_len = sizeof(peer_addr);
+  socklen_t peer_addr_len;
   ssize_t nread, nwritten; 
-  char buf[BUFSIZE];
   char ip[INET_ADDRSTRLEN];
+  unsigned char buf[MAX_ARR];
 
   while ((ch = getopt(argc, argv, "h:n:p:")) != -1) {
     switch (ch) {
@@ -86,20 +85,21 @@ int main(int argc, char **argv) {
   sockfd = server_setup(pongport);
 
   for (int i = 0; i < nping; i++) {
+    peer_addr_len = sizeof(peer_addr); // Reset
+
     // Recv arr from client
-    memset(buf, 0, sizeof(buf));
-    nread = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
-    if (nread == -1) {continue;}
+    nread = recvfrom(sockfd, buf, MAX_ARR, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
+    if (nread == -1) {
+      fprintf(stderr, "Error reading\n");
+      continue;
+    }
 
     // Retrieve IP 
     inet_ntop(peer_addr.ss_family, get_in_addr((struct sockaddr *) &peer_addr), ip, sizeof(ip));
     printf("pong[%d]: received packet from %s\n", i, ip);
 
     // Add one to every element in arr
-    for (int i = 0; i < nread; i++) {
-      printf("%d ", buf[i]);
-      buf[i] += 1;
-    }
+    for (int i = 0; i < nread; i++) {buf[i] ++;}
 
     // Send arr back to client
     nwritten = sendto(sockfd, buf, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len);
@@ -109,6 +109,10 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Error sending response\n");
     }
   }
+
+  // Cleanup
+  close(sockfd);
+  free(pongport);
 
   return 0;
 }

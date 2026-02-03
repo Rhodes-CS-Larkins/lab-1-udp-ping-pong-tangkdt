@@ -14,6 +14,7 @@
 #include "util.h"
 
 #define PORTNO "1266"
+#define INITIAL_VAL ((unsigned char) 200)
 
 int client_setup(char *host, char *pongport);
 
@@ -60,8 +61,8 @@ int main(int argc, char **argv) {
   char *pongport = strdup(PORTNO);      // Default port
   int arraysize = 100;                  // Default packet size
   int sockfd;
-  size_t bufsize;
   ssize_t nwritten, nread;
+  unsigned char *buf, expected_val;
                                         
   while ((ch = getopt(argc, argv, "h:n:p:s:")) != -1) {
     switch (ch) {
@@ -83,47 +84,57 @@ int main(int argc, char **argv) {
   }
 
   // Init arr
-  bufsize = arraysize * sizeof(int);
-  int *buf = malloc(bufsize);
+  buf = malloc(arraysize);
   if (!buf) {
     perror("Malloc failed!");
     exit(EXIT_FAILURE);
   }
-  for (int i = 0; i < arraysize; i++) {buf[i] = 200;}
+  for (int i = 0; i < arraysize; i++) {buf[i] = INITIAL_VAL;}
 
+  // Create UDP client socket
   sockfd = client_setup(ponghost, pongport);
 
   for (int i = 0; i < nping; i++) {
     start = get_wctime();
 
     // Send arr to server
-    nwritten = write(sockfd, buf, bufsize);
+    nwritten = write(sockfd, buf, (size_t) arraysize);
     if (nwritten != arraysize) {
       errors += 1;
       fprintf(stderr, "Partial/failed write\n");
     }
 
     // Wait and recv modified arr from server
-    nread = read(sockfd, buf, bufsize);
-    if (nread == -1) {
-      perror("read");
+    nread = read(sockfd, buf, (size_t) arraysize);
+    if (nread != arraysize) {
       errors += 1;
+      fprintf(stderr, "Partial/failed read\n");
     }
 
     end = get_wctime();
 
-    // Validate results from pong server
+    // Validate results from server
+    expected_val = INITIAL_VAL + i + 1; 
+    for (int j = 0; j < arraysize; j++) {
+      if (buf[j] != expected_val) {
+        fprintf(stderr, "Server did not modify arr correctly\n");
+      }
+    }
 
-    // Print round-trip times 
+    // Output round-trip times 
     RTT = (end - start) * 1000; // Secs -> ms
-    printf("ping[%d] : round-trip time: %lf ms\n", i, RTT);
+    printf("ping[%d] : round-trip time: %.3lf ms\n", i, RTT);
     total_RTT += RTT;
   }
 
   avg_RTT = total_RTT / nping;
-  if (errors < 0) {printf("no errors detected");}
-  printf("time to send %d packets of %d bytes %lf (%lf avg per packet)\n", nping, arraysize, total_RTT, avg_RTT);
+  if (errors == 0) {printf("no errors detected\n");}
+  printf("time to send %d packets of %d bytes %.3lf ms (%.3lf avg per packet)\n", nping, arraysize, total_RTT, avg_RTT);
 
+  // Cleanup
+  close(sockfd);
+  free(ponghost);
+  free(pongport);
   free(buf);
 
   return 0;
