@@ -49,6 +49,8 @@ int server_setup(char *port) {
     close(sockfd);
   }
 
+  freeaddrinfo(servinfo);
+
   // No addr succeeded 
   if (!p) {
     fprintf(stderr, "Could not bind\n");
@@ -59,14 +61,14 @@ int server_setup(char *port) {
 }
 
 int main(int argc, char **argv) {
-  int ch, sockfd;
-  int nping = 1;                    // Default packet count
-  char *pongport = strdup(PORTNO);  // Default port
+  char ip[INET_ADDRSTRLEN];
+  unsigned char buf[MAX_ARR];
   struct sockaddr_storage peer_addr; 
   socklen_t peer_addr_len;
   ssize_t nread, nwritten; 
-  char ip[INET_ADDRSTRLEN];
-  unsigned char buf[MAX_ARR];
+  int ch, sockfd;
+  int nping = 1;                    // Default packet count
+  char *pongport = strdup(PORTNO);  // Default port
 
   while ((ch = getopt(argc, argv, "h:n:p:")) != -1) {
     switch (ch) {
@@ -99,7 +101,9 @@ int main(int argc, char **argv) {
     printf("pong[%d]: received packet from %s\n", i, ip);
 
     // Add one to every element in arr
-    for (int i = 0; i < nread; i++) {buf[i] ++;}
+    for (int i = 0; i < nread; i++) {
+      buf[i] = (buf[i] + 1) % sizeof(unsigned char);
+    }
 
     // Send arr back to client
     nwritten = sendto(sockfd, buf, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len);

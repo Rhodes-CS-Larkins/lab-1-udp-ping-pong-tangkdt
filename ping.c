@@ -19,8 +19,8 @@
 int client_setup(char *host, char *pongport);
 
 int client_setup(char *host, char *pongport) {
-  int sockfd, rv;
   struct addrinfo hints, *servinfo, *p;
+  int sockfd, rv;
 
   // Set criteria for returned socket addrs 
   memset(&hints, 0, sizeof(hints));
@@ -44,6 +44,8 @@ int client_setup(char *host, char *pongport) {
     close(sockfd);
   }
 
+  freeaddrinfo(servinfo);
+
   // No addr succeeded
   if (!p) {
     fprintf(stderr, "Could not connect\n");
@@ -55,13 +57,12 @@ int client_setup(char *host, char *pongport) {
 
 int main(int argc, char **argv) {
   double start, end, RTT, total_RTT = 0.0, avg_RTT;
-  int ch, errors = 0;
+  int ch, sockfd, errors = 0;
+  ssize_t nwritten, nread;
   int nping = 1;                        // Default packet count
   char *ponghost = strdup("localhost"); // Default host
   char *pongport = strdup(PORTNO);      // Default port
   int arraysize = 100;                  // Default packet size
-  int sockfd;
-  ssize_t nwritten, nread;
   unsigned char *buf, expected_val;
                                         
   while ((ch = getopt(argc, argv, "h:n:p:s:")) != -1) {
@@ -114,9 +115,10 @@ int main(int argc, char **argv) {
     end = get_wctime();
 
     // Validate results from server
-    expected_val = INITIAL_VAL + i + 1; 
+    expected_val = (INITIAL_VAL + i + 1) % sizeof(unsigned char); 
     for (int j = 0; j < arraysize; j++) {
       if (buf[j] != expected_val) {
+        errors += 1;
         fprintf(stderr, "Server did not modify arr correctly\n");
       }
     }
