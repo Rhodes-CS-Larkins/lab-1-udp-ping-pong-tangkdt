@@ -106,9 +106,7 @@ int main(int argc, char **argv) {
     printf("pong[%d]: received packet from %s\n", i, ip);
 
     // Add one to every element in arr
-    for (int i = 0; i < nread; i++) {
-      buf[i] = (buf[i] + 1) % 255;
-    }
+    for (int i = 0; i < nread; i++) {buf[i] = (buf[i] + 1) % 255;}
 
     // Send arr back to client
     nwritten = sendto(sockfd, buf, nread, 0, (struct sockaddr *) &peer_addr, peer_addr_len);

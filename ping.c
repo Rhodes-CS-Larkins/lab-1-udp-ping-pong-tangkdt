@@ -63,7 +63,8 @@ int main(int argc, char **argv) {
   char *ponghost = strdup("localhost"); // Default host
   char *pongport = strdup(PORTNO);      // Default port
   int arraysize = 100;                  // Default packet size
-  unsigned char *buf, expected_val;
+  unsigned char *send_buf, *recv_buf;
+  unsigned char expected_val;
                                         
   while ((ch = getopt(argc, argv, "h:n:p:s:")) != -1) {
     switch (ch) {
@@ -85,19 +86,25 @@ int main(int argc, char **argv) {
   }
 
   // Init arr
-  buf = malloc(arraysize);
-  if (!buf) {
+  send_buf = (unsigned char *) malloc(arraysize);
+  recv_buf = (unsigned char *) malloc(arraysize);
+
+  if (!send_buf || !recv_buf) {
     perror("Malloc failed!");
+    free(send_buf); free(recv_buf);
     free(ponghost); free(pongport);
     exit(EXIT_FAILURE);
   }
-  for (int i = 0; i < arraysize; i++) {buf[i] = INITIAL_VAL;}
+
+  for (int i = 0; i < arraysize; i++) {send_buf[i] = INITIAL_VAL;}
+  expected_val = (INITIAL_VAL + 1) % 255; 
 
   // Create UDP client socket
   sockfd = client_setup(ponghost, pongport);
   if (sockfd == -1) {
     fprintf(stderr, "Failed to create UDP client socket");
-    free(ponghost); free(pongport); free(buf);
+    free(send_buf); free(recv_buf);
+    free(ponghost); free(pongport);
     exit(EXIT_FAILURE);
   }
 
@@ -105,14 +112,14 @@ int main(int argc, char **argv) {
     start = get_wctime();
 
     // Send arr to server
-    nwritten = write(sockfd, buf, (size_t) arraysize);
+    nwritten = write(sockfd, send_buf, (size_t) arraysize);
     if (nwritten != arraysize) {
       errors += 1;
       fprintf(stderr, "Partial/failed write\n");
     }
 
     // Wait and recv modified arr from server
-    nread = read(sockfd, buf, (size_t) arraysize);
+    nread = read(sockfd, recv_buf, (size_t) arraysize);
     if (nread != arraysize) {
       errors += 1;
       fprintf(stderr, "Partial/failed read\n");
@@ -121,11 +128,10 @@ int main(int argc, char **argv) {
     end = get_wctime();
 
     // Validate results from server
-    expected_val = (INITIAL_VAL + i + 1) % 255; 
     for (int j = 0; j < arraysize; j++) {
-      if (buf[j] != expected_val) {
-        errors += 1;
+      if (recv_buf[j] != expected_val) {
         fprintf(stderr, "Server did not modify arr correctly\n");
+        errors += 1;
       }
     }
 
@@ -141,7 +147,8 @@ int main(int argc, char **argv) {
 
   // Cleanup
   close(sockfd);
-  free(ponghost); free(pongport); free(buf);
+  free(send_buf); free(recv_buf);
+  free(ponghost); free(pongport);
 
   return 0;
 }
