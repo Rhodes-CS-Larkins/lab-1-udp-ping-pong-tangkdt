@@ -31,7 +31,7 @@ int client_setup(char *host, char *pongport) {
   rv = getaddrinfo(host, pongport, &hints, &servinfo);
   if (rv != 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    exit(EXIT_FAILURE);
+    return -1;
   }
 
   // Attempt to connect to avail addrs
@@ -49,7 +49,7 @@ int client_setup(char *host, char *pongport) {
   // No addr succeeded
   if (!p) {
     fprintf(stderr, "Could not connect\n");
-    exit(EXIT_FAILURE);
+    return -1;
   }
   
   return sockfd;
@@ -88,12 +88,18 @@ int main(int argc, char **argv) {
   buf = malloc(arraysize);
   if (!buf) {
     perror("Malloc failed!");
+    free(ponghost); free(pongport);
     exit(EXIT_FAILURE);
   }
   for (int i = 0; i < arraysize; i++) {buf[i] = INITIAL_VAL;}
 
   // Create UDP client socket
   sockfd = client_setup(ponghost, pongport);
+  if (sockfd == -1) {
+    fprintf(stderr, "Failed to create UDP client socket");
+    free(ponghost); free(pongport); free(buf);
+    exit(EXIT_FAILURE);
+  }
 
   for (int i = 0; i < nping; i++) {
     start = get_wctime();
@@ -115,7 +121,7 @@ int main(int argc, char **argv) {
     end = get_wctime();
 
     // Validate results from server
-    expected_val = (INITIAL_VAL + i + 1) % sizeof(unsigned char); 
+    expected_val = (INITIAL_VAL + i + 1) % 255; 
     for (int j = 0; j < arraysize; j++) {
       if (buf[j] != expected_val) {
         errors += 1;
@@ -135,9 +141,7 @@ int main(int argc, char **argv) {
 
   // Cleanup
   close(sockfd);
-  free(ponghost);
-  free(pongport);
-  free(buf);
+  free(ponghost); free(pongport); free(buf);
 
   return 0;
 }

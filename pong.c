@@ -36,7 +36,7 @@ int server_setup(char *port) {
   rv = getaddrinfo(NULL, port, &hints, &servinfo);
   if (rv != 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    exit(EXIT_FAILURE);
+    return -1;
   }
 
   // Attempt to bind to avail socket addr
@@ -54,7 +54,7 @@ int server_setup(char *port) {
   // No addr succeeded 
   if (!p) {
     fprintf(stderr, "Could not bind\n");
-    exit(EXIT_FAILURE);
+    return -1;
   }
  
   return sockfd;
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
   int nping = 1;                    // Default packet count
   char *pongport = strdup(PORTNO);  // Default port
 
-  while ((ch = getopt(argc, argv, "h:n:p:")) != -1) {
+  while ((ch = getopt(argc, argv, "n:p:")) != -1) {
     switch (ch) {
     case 'n':
       nping = atoi(optarg);
@@ -85,6 +85,11 @@ int main(int argc, char **argv) {
 
   // Create UDP server socket
   sockfd = server_setup(pongport);
+  if (sockfd == -1) {
+    fprintf(stderr, "Error creating UDP server socket");
+    free(pongport);
+    exit(EXIT_FAILURE);
+  }
 
   for (int i = 0; i < nping; i++) {
     peer_addr_len = sizeof(peer_addr); // Reset
@@ -102,7 +107,7 @@ int main(int argc, char **argv) {
 
     // Add one to every element in arr
     for (int i = 0; i < nread; i++) {
-      buf[i] = (buf[i] + 1) % sizeof(unsigned char);
+      buf[i] = (buf[i] + 1) % 255;
     }
 
     // Send arr back to client
